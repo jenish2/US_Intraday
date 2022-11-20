@@ -1,0 +1,18 @@
+{
+  "Stock_Name": [
+    "AMZN",
+    "AAPL"
+  ],
+  "Quantity": 1,
+  "Init_PO_Stop_Limit_%": 1,
+  "Price_Up_%": 1,
+  "Trailing_Stop_%": 1,
+  "Order_Type": "MKT",
+  "Time_Frame_Min": 5,
+  "Delta_Range_%": 1,
+  "CCI_Value": 20,
+  "IS_TD_AMERITRADE_BROKER": true,
+  "IS_Interactive_BROKER": false,
+  "User_Name": "",
+  "Password": ""
+}

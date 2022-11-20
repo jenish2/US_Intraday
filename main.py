@@ -1,16 +1,20 @@
-# This is a sample Python script.
+# Author : Jenish Dholariya
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import json
+import os
+from Bot.bot import Bot
 
+with open(os.path.join(os.path.dirname(__file__), "UserInput", 'User_Settings.json')) as f:
+    user_config = json.load(f)
+    f.close()
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+with open(os.path.join(os.path.dirname(__file__), "UserInput", 'CCI_Indicator.json')) as f:
+    cci_config = json.load(f)
+    f.close()
 
+with open(os.path.join(os.path.dirname(__file__), "UserInput", 'EMA_Indicator.json')) as f:
+    ema_config = json.load(f)
+    f.close()
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+bot = Bot(user_config, cci_config, ema_config)
+bot.run_bot()

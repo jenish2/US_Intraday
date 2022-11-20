@@ -1,0 +1,8 @@
+{
+  "EMA_Length": 1,
+  "Time_Frame": "",
+  "Source": "close",
+  "Offset": 0,
+  "Method_Smoothing": "SMA",
+  "Length_Smoothing": 1
+}
