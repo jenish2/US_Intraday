@@ -8,11 +8,22 @@
   "Price_Up_%": 1,
   "Trailing_Stop_%": 1,
   "Order_Type": "MKT",
-  "Time_Frame_Min": 5,
+  "Time_Frame_In_Minutes": "30m",
   "Delta_Range_%": 1,
   "CCI_Value": 20,
-  "IS_TD_AMERITRADE_BROKER": true,
-  "IS_Interactive_BROKER": false,
+  "IS_TD_AMERITRADE_BROKER": false,
+  "TD_AMERITRADE_CREDENTIALS": {
+    "api_key": "Q9SPHIMLEOIIGGTE4QISQAG7OFMXMJZY",
+    "redirect_url": "https://localhost",
+    "account_id": "testing123"
+  },
+  "IS_Interactive_BROKER": true,
+  "Interactive_Broker_CREDENTIALS": {
+    "account": "IB",
+    "host": "127.0.0.1",
+    "port": 7497,
+    "client_id": 1
+  },
   "User_Name": "",
   "Password": ""
 }

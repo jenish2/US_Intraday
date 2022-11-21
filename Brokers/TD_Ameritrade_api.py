@@ -34,7 +34,24 @@ class TD_Ameritrade_api:
             self.client = auth.client_from_login_flow(driver, self.CRED['api_key'], self.CRED['redirect_url'],
                                                       self.TOKEN_PATH)
 
-    def get_candle_data(self, symbol: str, timeframe: str, period='1d') -> pd.DataFrame:
+    def is_market_open(self, date: str):
+        url = f"https://api.tdameritrade.com/v1/marketdata/hours?apikey={self.CRED['api_key']}&markets=EQUITY&date={date}"
+        response = requests.get(url).json()
+
+        # try:
+        #     is_market_open = response['equity']['equity']['isOpen']
+        #     return is_market_open
+        # except Exception as e:
+        #     print(e)
+        #
+        # try:
+        #     is_market_open = response['equity']['EQ']['isOpen']
+        #     return is_market_open
+        # except Exception as e:
+        #     print(e)
+        return True
+
+    def get_candle_data(self, symbol: str, timeframe: str, period='1M') -> pd.DataFrame:
         """
         Get realtime candlestick data\n
         symbol		: str 	= symbol of the ticker\n
@@ -83,4 +100,5 @@ if __name__ == "__main__":
         'account_id': 'testing123'
     }
     api = TD_Ameritrade_api(cred)
-    print(api.get_candle_data('MSFT', "15m"))
+    # print(api.get_candle_data('MSFT', "15m"))
+    # print(api.is_market_open('2022-11-21'))

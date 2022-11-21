@@ -1,3 +1,7 @@
+import pandas as pd
+
+
 class EntryCondition:
-    def __int__(self):
-        pass
+    @staticmethod
+    def check_for_entry(df: pd.DataFrame):
+
