@@ -37,21 +37,20 @@ class TD_Ameritrade_api:
     def is_market_open(self, date: str):
         url = f"https://api.tdameritrade.com/v1/marketdata/hours?apikey={self.CRED['api_key']}&markets=EQUITY&date={date}"
         response = requests.get(url).json()
+        try:
+            is_market_open = response['equity']['equity']['isOpen']
+            return is_market_open
+        except Exception as e:
+            pass
 
-        # try:
-        #     is_market_open = response['equity']['equity']['isOpen']
-        #     return is_market_open
-        # except Exception as e:
-        #     print(e)
-        #
-        # try:
-        #     is_market_open = response['equity']['EQ']['isOpen']
-        #     return is_market_open
-        # except Exception as e:
-        #     print(e)
-        return True
+        try:
+            is_market_open = response['equity']['EQ']['isOpen']
+            return is_market_open
+        except Exception as e:
+            print(e)
+        # return True
 
-    def get_candle_data(self, symbol: str, timeframe: str, period='1M') -> pd.DataFrame:
+    def get_candle_data(self, symbol: str, timeframe: str, period='1d') -> pd.DataFrame:
         """
         Get realtime candlestick data\n
         symbol		: str 	= symbol of the ticker\n

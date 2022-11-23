@@ -1,7 +1,5 @@
 {
-  "CCI_Length": 1,
-  "Time_Frame": "",
-  "Source": "",
+  "CCI_Length": 20,
   "Method_Smoothing": "",
   "Length_Smoothing": ""
 }

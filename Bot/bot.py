@@ -3,7 +3,8 @@ import logging
 from datetime import datetime
 from Brokers.TD_Ameritrade_api import TD_Ameritrade_api
 from Brokers.InteractiveBrokers_api import InteractiveBrokerAPI
-from entry_condition import EntryCondition
+from Bot.entry_condition import EntryCondition
+
 
 class Bot:
     _position = {}
@@ -26,7 +27,14 @@ class Bot:
     def _from_current_date_check_market_is_open(credentials):
         cT = datetime.now(pytz.timezone('America/New_York'))
         td_ameritrade_api = TD_Ameritrade_api(credentials)
-        return td_ameritrade_api.is_market_open(str(cT.date().today())), td_ameritrade_api
+        if td_ameritrade_api.is_market_open(str(cT.date().today())):
+
+            starting_time = cT.replace(hour=9, minute=30, second=0, microsecond=0)
+            ending_time = cT.replace(hour=16, minute=0, second=0, microsecond=0)
+
+            if starting_time <= cT < ending_time:
+                return True, td_ameritrade_api
+        return False, td_ameritrade_api
 
     def run_bot(self):
         print("Bot Started!!")
@@ -49,13 +57,26 @@ class Bot:
                     for stock_symbol in self.USER_CONFIG['Stock_Name']:
                         # getting the data
                         _period = {
-                            "1m": "5d",
-                            "5m": "5d",
-                            "15m": "10d",
-                            "30m": "10d"
+                            "1m": "4d",
+                            "5m": "4d",
+                            "15m": "9d",
+                            "30m": "9d"
                         }
                         df = td_ameritrade_api.get_candle_data(symbol=stock_symbol,
-                                                               timeframe=self.USER_CONFIG['Time_Frame_In_Minutes'],
-                                                               period=_period[
-                                                                   self.USER_CONFIG['Time_Frame_In_Minutes']])
-                        EntryCondition.check_for_entry(df)
+                                                               timeframe=self.USER_CONFIG['Time_Frame_In_Minutes']
+                                                               )
+
+                        print(datetime.now(pytz.timezone('America/New_York')))
+
+                        # Checking For Entry Condition
+                        if stock_symbol not in self._position:
+                            is_enter, side = EntryCondition.check_for_entry(df, self.USER_CONFIG, self.EMA_CONFIG,
+                                                                            self.CCI_CONFIG)
+                            if is_enter:
+                                if side == "Buy":
+                                    pass
+                                if side == "Sell":
+                                    pass
+                        else:
+                            # checking for the Exit Condition
+                            pass
