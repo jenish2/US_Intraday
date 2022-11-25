@@ -1,6 +1,6 @@
 {
   "EMA_Length": 20,
-  "Source": "close",
+  "Source": "Close",
   "Offset": 0,
   "Method_Smoothing": "SMA",
   "Length_Smoothing": 1

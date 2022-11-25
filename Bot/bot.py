@@ -4,6 +4,7 @@ from datetime import datetime
 from Brokers.TD_Ameritrade_api import TD_Ameritrade_api
 from Brokers.InteractiveBrokers_api import InteractiveBrokerAPI
 from Bot.entry_condition import EntryCondition
+from Brokers.market_data import MarketData
 
 
 class Bot:
@@ -57,14 +58,16 @@ class Bot:
                     for stock_symbol in self.USER_CONFIG['Stock_Name']:
                         # getting the data
                         _period = {
-                            "1m": "4d",
-                            "5m": "4d",
-                            "15m": "9d",
-                            "30m": "9d"
+                            "1m": "7d",
+                            "5m": "60d",
+                            "15m": "60d",
+                            "30m": "60d",
+                            "60m": "730d"
                         }
-                        df = td_ameritrade_api.get_candle_data(symbol=stock_symbol,
-                                                               timeframe=self.USER_CONFIG['Time_Frame_In_Minutes']
-                                                               )
+                        df = MarketData.get_market_data(symbol=stock_symbol,
+                                                        interval=self.USER_CONFIG['Time_Frame_In_Minutes'],
+                                                        period=_period[self.USER_CONFIG['Time_Frame_In_Minutes']]
+                                                        )
 
                         print(datetime.now(pytz.timezone('America/New_York')))
 
