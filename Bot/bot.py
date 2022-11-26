@@ -1,14 +1,64 @@
+import time
+
 import pytz
 import logging
+import threading
 from datetime import datetime
 from Brokers.TD_Ameritrade_api import TD_Ameritrade_api
 from Brokers.InteractiveBrokers_api import InteractiveBrokerAPI
 from Bot.entry_condition import EntryCondition
 from Brokers.market_data import MarketData
 
+_position = {}
+_all_threads = []
+
+
+def checking_the_trailing_stop_to_be_add_IB(api, priceWhereShouldAddTrailingStopLoss, stock, stock_purchased_price,
+                                            trailing_stop_percentage):
+    while True:
+        time.sleep(5)
+        df = MarketData.get_market_data(symbol=stock,
+                                        interval="1m",
+                                        period="1d"
+                                        )
+        if _position.get(stock)['side'] == "BUY":
+            if df['High'].iat[-1] >= _position.get(stock)['take_profit']:
+                del _position[stock]
+                break
+            if df['Low'].iat[-1] <= _position.get(stock)['stop_loss']:
+                del _position[stock]
+                break
+
+            if df['High'].iat[-1] > priceWhereShouldAddTrailingStopLoss:
+                api.update_order_stop_loss(symbol=stock, side=_position.get(stock)['side'],
+                                           quantity=_position.get(stock)['qtc'],
+                                           parent_order_id=_position.get(stock)['side'],
+                                           stop_loss_price_updated=stock_purchased_price,
+                                           trail_percentage=trailing_stop_percentage)
+
+                del _position[stock]
+                break
+
+        if _position.get(stock)['side'] == "SELL":
+            if df['Low'].iat[-1] <= _position.get(stock)['take_profit']:
+                del _position[stock]
+                break
+            if df['High'].iat[-1] >= _position.get(stock)['stop_loss']:
+                del _position[stock]
+                break
+
+            if df['Low'].iat[-1] < priceWhereShouldAddTrailingStopLoss:
+                api.update_order_stop_loss(symbol=stock, side=_position.get(stock)['side'],
+                                           quantity=_position.get(stock)['qtc'],
+                                           parent_order_id=_position.get(stock)['side'],
+                                           stop_loss_price_updated=stock_purchased_price,
+                                           trail_percentage=trailing_stop_percentage)
+
+                del _position[stock]
+                break
+
 
 class Bot:
-    _position = {}
 
     def __init__(self, user_config: dict, cci_config: dict, ema_config: dict):
         self.API = None
@@ -72,7 +122,7 @@ class Bot:
                         print(datetime.now(pytz.timezone('America/New_York')))
 
                         # Checking For Entry Condition
-                        if stock_symbol not in self._position:
+                        if stock_symbol not in _position:
                             is_enter, side, last_closing_ema = EntryCondition.check_for_entry(df, self.USER_CONFIG,
                                                                                               self.EMA_CONFIG,
                                                                                               self.CCI_CONFIG)
@@ -92,7 +142,8 @@ class Bot:
                                         'take_profit': take_profit,
                                         'stop_loss': stop_loss,
                                         'side': side,
-                                        'qtc': self.USER_CONFIG['Quantity']
+                                        'qtc': self.USER_CONFIG['Quantity'],
+                                        'trailing_stop_loss_added': False
                                     }
 
                                     if side == "BUY":
@@ -102,7 +153,7 @@ class Bot:
                                     if side == "SELL":
                                         if take_profit < stop_loss:
                                             _is_valid_target_profit_stop_loss = True
-
+                                    is_in_exception_block = False
                                     if _is_valid_target_profit_stop_loss:
                                         try:
                                             order_id = self.API.place_bracket_order(
@@ -112,12 +163,17 @@ class Bot:
                                             _signal['order_id'] = order_id
 
                                         except Exception as e:
+                                            is_in_exception_block = True
                                             print(e)
+                                        if not is_in_exception_block:
+                                            _position[stock_symbol] = _signal.copy()
+                                            _all_threads.append(
+                                                threading.Thread(target=checking_the_trailing_stop_to_be_add_IB, args=(
+                                                    self.API,
+                                                    (last_closing_price * (1 + self.USER_CONFIG['Price_Up_%'])),
+                                                    stock_symbol, last_closing_price,
+                                                    self.USER_CONFIG['Trailing_Stop_%'])).start())
                                     else:
                                         logging.log(
                                             f"Target Profit :-{take_profit}    StopLoss :- {stop_loss}  Side:-{side}")
                                         logging.error("TAKE PROFIT AND STOP LOSS IS INVALID")
-
-                                else:
-                                    # checking for the Exit Condition
-                                    pass

@@ -14,4 +14,4 @@ class MarketData:
 
 
 if __name__ == "__main__":
-    MarketData.get_market_data('AAPL', '1d', "1m")
+    print(MarketData.get_market_data('AAPL', '1d', "1m"))

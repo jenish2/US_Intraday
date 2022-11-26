@@ -19,13 +19,12 @@ from ibapi.contract import Contract, ContractDetails
 from ibapi.commission_report import CommissionReport
 from ibapi.execution import Execution, ExecutionFilter
 
-_tws_orders = {}
-_completed_orders = []
-_open_orders = []
-order_id = None
-
 
 class InteractiveBrokerAPI(EWrapper, EClient):
+    _tws_orders = {}
+    _completed_orders = []
+    _open_orders = []
+    order_id = None
 
     def __init__(self, credentials: dict):
         EClient.__init__(self, self)
@@ -86,18 +85,18 @@ class InteractiveBrokerAPI(EWrapper, EClient):
             self._tws_orders[int(orderId)].update(
                 {'symbol': contract.symbol, 'side': order.action, 'type': order.orderType})
 
-        print('openOrder id:', orderId, contract.symbol, contract.secType, '@', contract.exchange, ':', order.action,
-              order.orderType, 'quantity:', order.totalQuantity, orderState.status)
+        # print('openOrder id:', orderId, contract.symbol, contract.secType, '@', contract.exchange, ':', order.action,
+        #       order.orderType, 'quantity:', order.totalQuantity, orderState.status)
 
     def orderStatus(self, orderId: OrderId, status: str, filled: float, remaining: float, avgFillPrice: float,
                     permId: int, parentId: int, lastFillPrice: float, clientId: int, whyHeld: str, mktCapPrice: float):
         if int(orderId) in self._tws_orders:
             self._tws_orders[int(orderId)].update({'perm_id': permId})
 
-        print(self._tws_orders)
+        # print(self._tws_orders)
         if status.upper() == 'FILLED':
-            print('orderStatus - orderid:', orderId, 'status:', status, 'filled', filled, 'remaining', remaining,
-                  'lastFillPrice', lastFillPrice)
+            # print('orderStatus - orderid:', orderId, 'status:', status, 'filled', filled, 'remaining', remaining,
+            #       'lastFillPrice', lastFillPrice)
             self._tws_orders[int(orderId)]['fill_price'] = lastFillPrice
             if self.app is not None:
                 symbol = self._tws_orders[int(orderId)]['symbol']
@@ -198,11 +197,9 @@ class InteractiveBrokerAPI(EWrapper, EClient):
         except Exception as e:
             print(e)
 
-    def cancel_order(self, order_id: int) -> None:
-        """
-        Cancel open order\n
-        """
-        self.cancelOrder(orderId=order_id)
+    def cancel_all_position(self) -> None:
+        print(self.reqPositions())
+        self.cancelPositions()
 
 
 if __name__ == "__main__":
@@ -221,5 +218,6 @@ if __name__ == "__main__":
                                stop_loss_price_updated=148.2,
                                trail_percentage=0.9)
 
+    api.cancel_all_position()
     # print("SIII")
     # api.cancel_order(7)
