@@ -52,7 +52,7 @@ class EntryCondition:
                                                                                   last_closing_ema=last_closing_ema,
                                                                                   last_previous_closing_ema=last_previous_closing_ema,
                                                                                   user_config=user_config):
-            return True, 'Buy'
+            return True, 'BUY', last_closing_ema
 
         if EntryCondition.is_cci_condition_for_sell(cci_value=last_closing_cci, y_parameter=user_config[
             'Y_Min_Value_For_CCI']) and EntryCondition.is_delta_condition_for_buy(last_closing_price=last_closing_price,
@@ -60,6 +60,6 @@ class EntryCondition:
                                                                                   last_closing_ema=last_closing_ema,
                                                                                   last_previous_closing_ema=last_previous_closing_ema,
                                                                                   user_config=user_config):
-            return True, 'Sell'
+            return True, 'SELL', last_closing_ema
 
-        return False, ''
+        return False, '', last_closing_ema

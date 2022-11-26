@@ -19,10 +19,9 @@ class Bot:
     # Helper methods
     @staticmethod
     def _tick_on_timeframe(timeframe: str = '1m'):
-        # cT = datetime.now(pytz.timezone('America/New_York'))
-        # if timeframe[-1] == 'm':
-        #     return (cT.second == 0) and (cT.minute % int(timeframe[:-1])) == 0
-        return True
+        cT = datetime.now(pytz.timezone('America/New_York'))
+        if timeframe[-1] == 'm':
+            return (cT.second == 0) and (cT.minute % int(timeframe[:-1])) == 0
 
     @staticmethod
     def _from_current_date_check_market_is_open(credentials):
@@ -68,18 +67,57 @@ class Bot:
                                                         interval=self.USER_CONFIG['Time_Frame_In_Minutes'],
                                                         period=_period[self.USER_CONFIG['Time_Frame_In_Minutes']]
                                                         )
+                        last_closing_price = df['Close'].iat[-1]
 
                         print(datetime.now(pytz.timezone('America/New_York')))
 
                         # Checking For Entry Condition
                         if stock_symbol not in self._position:
-                            is_enter, side = EntryCondition.check_for_entry(df, self.USER_CONFIG, self.EMA_CONFIG,
-                                                                            self.CCI_CONFIG)
+                            is_enter, side, last_closing_ema = EntryCondition.check_for_entry(df, self.USER_CONFIG,
+                                                                                              self.EMA_CONFIG,
+                                                                                              self.CCI_CONFIG)
                             if is_enter:
-                                if side == "Buy":
+                                if self.USER_CONFIG['IS_Interactive_BROKER']:
+                                    _is_valid_target_profit_stop_loss = False
+                                    take_profit = (last_closing_price * (
+                                            1 + self.USER_CONFIG['Target_Profit_%'])) if side == "BUY" else (
+                                            last_closing_price * (
+                                            1 - self.USER_CONFIG['Target_Profit_%']))
+
+                                    stop_loss = last_closing_ema * (1 - self.USER_CONFIG[
+                                        'Init_PO_Stop_Limit_%']) if side == "BUY" else last_closing_ema * (
+                                            1 + self.USER_CONFIG['Init_PO_Stop_Limit_%'])
+                                    _signal = {
+                                        'symbol': stock_symbol,
+                                        'take_profit': take_profit,
+                                        'stop_loss': stop_loss,
+                                        'side': side,
+                                        'qtc': self.USER_CONFIG['Quantity']
+                                    }
+
+                                    if side == "BUY":
+                                        if take_profit > stop_loss:
+                                            _is_valid_target_profit_stop_loss = True
+
+                                    if side == "SELL":
+                                        if take_profit < stop_loss:
+                                            _is_valid_target_profit_stop_loss = True
+
+                                    if _is_valid_target_profit_stop_loss:
+                                        try:
+                                            order_id = self.API.place_bracket_order(
+                                                symbol=stock_symbol, side=side, quantity=self.USER_CONFIG['Quantity'],
+                                                take_profit_limit_price=take_profit,
+                                                stop_loss_price=stop_loss)
+                                            _signal['order_id'] = order_id
+
+                                        except Exception as e:
+                                            print(e)
+                                    else:
+                                        logging.log(
+                                            f"Target Profit :-{take_profit}    StopLoss :- {stop_loss}  Side:-{side}")
+                                        logging.error("TAKE PROFIT AND STOP LOSS IS INVALID")
+
+                                else:
+                                    # checking for the Exit Condition
                                     pass
-                                if side == "Sell":
-                                    pass
-                        else:
-                            # checking for the Exit Condition
-                            pass

@@ -2,6 +2,7 @@
 import os, json, pytz, time
 import datetime as dt
 from datetime import datetime
+from decimal import Decimal
 from threading import Thread
 from copy import deepcopy
 
@@ -18,52 +19,17 @@ from ibapi.contract import Contract, ContractDetails
 from ibapi.commission_report import CommissionReport
 from ibapi.execution import Execution, ExecutionFilter
 
+_tws_orders = {}
+_completed_orders = []
+_open_orders = []
+order_id = None
+
 
 class InteractiveBrokerAPI(EWrapper, EClient):
-    ID = "VT_API_TWS_IB"
-    NAME = "Interactive Brokers TWS API"
-    AUTHOR = "Variance Technologies pvt. ltd."
-    EXCHANGE = "SMART"
-    BROKER = "IB"
-    MARKET = "SMART"
-
-    TIMEZONE = "UTC"
-
-    API_THREAD = None
-    MAX_WAIT_TIME = 5
-
-    app = None
-
-    orderId = None
-    _candle_data = []
-    _completed_orders = []
-    _contract_detail_info = None
-    _expiries_and_strikes = {}
-    _open_orders = []
-    _tws_orders = {}
-    _account = None
-    _account_cash_balance = None
-    _default_time_in_force = "DAY"
-    _commissions = {}
-    _executions = {}
-    _sec_type = {
-        "stock": "STK",
-        "stocks": "STK",
-        "option": "OPT",
-        "options": "OPT",
-        "futureContract": "FUT",
-        "futureContractOption": "FOP",
-        "futureContractOptions": "FOP",
-        "Stocks": "STK",
-        "Options": "OPT",
-        "FutureContract": "FUT",
-        "FutureContractOptions": "FOP",
-    }
 
     def __init__(self, credentials: dict):
         EClient.__init__(self, self)
 
-        self._candle_data = []
         self.CREDS = credentials
         self.TIMEZONE = "US/Eastern"
 
@@ -89,151 +55,154 @@ class InteractiveBrokerAPI(EWrapper, EClient):
     def connect_app(self, app) -> None:
         self.app = app
 
-    def get_account_info(self) -> dict:
+    def _get_next_order_id(self):
+        """get the current class variable order_id and increment
+        it by one.
         """
-        Returns account information\n
+        # reqIds can be used to update the order_id, if tracking is lost.
+        # self.reqIds(-1)
+        current_order_id = self.order_id
+        self.order_id += 1
+        return current_order_id
+
+    def nextValidId(self, orderId: int):
         """
-        a = self.reqAccountSummary(1, "All", AccountSummaryTags.AllTags)
-        time.sleep(2)
-        return self._account
-
-    def get_account_balance(self) -> float:
+        Method of EWrapper.
+        Is called from EWrapper after a successful connection establishment.
         """
-        Returns account balance for segment\n
-        """
-        self.reqAccountSummary(1, "All", AccountSummaryTags.TotalCashValue)
-        time.sleep(2)
-        return self._account_cash_balance
+        super().nextValidId(orderId)
+        self.order_id = orderId
+        return self
 
-    ## Historical data
-    def historicalData(self, reqId: int, bar: BarData):
-        _ = {
-            "datetime": bar.date,
-            "open": bar.open,
-            "high": bar.high,
-            "low": bar.low,
-            "close": bar.close,
-            "volume": bar.volume
-        }
-        self._candle_data.append(_)
+    def completedOrder(self, contract: Contract, order: Order, orderState):
+        self._completed_orders.append(
+            {'symbol': contract.symbol, "order_id": order.permId, "status": orderState.status, "price": order.lmtPrice})
 
-        # print(bar.date, bar.open, bar.high, bar.low, bar.close,)
+    def openOrder(self, orderId: OrderId, contract: Contract, order: Order, orderState):
+        self._open_orders.append({'symbol': contract.symbol, "order_id": order.permId, "status": orderState.status})
 
-    def historicalDataEnd(self, reqId: int, start: str, end: str):
-        # print(reqId, start, end)
-        ...
+        if int(orderId) not in self._tws_orders:
+            self._tws_orders[int(orderId)] = {}
+            self._tws_orders[int(orderId)].update(
+                {'symbol': contract.symbol, 'side': order.action, 'type': order.orderType})
 
-    def get_candle_data(self, contract: str, symbol: str, timeframe: str, period: str = '2d', exchange: str = ...,
-                        **options) -> pd.DataFrame:
-        """
-        Get candle data from the api\n
-        """
+        print('openOrder id:', orderId, contract.symbol, contract.secType, '@', contract.exchange, ':', order.action,
+              order.orderType, 'quantity:', order.totalQuantity, orderState.status)
 
-        _tf = {
-            's': "sec",
-            'm': "min"
-        }
+    def orderStatus(self, orderId: OrderId, status: str, filled: float, remaining: float, avgFillPrice: float,
+                    permId: int, parentId: int, lastFillPrice: float, clientId: int, whyHeld: str, mktCapPrice: float):
+        if int(orderId) in self._tws_orders:
+            self._tws_orders[int(orderId)].update({'perm_id': permId})
 
-        self._candle_data = []
+        print(self._tws_orders)
+        if status.upper() == 'FILLED':
+            print('orderStatus - orderid:', orderId, 'status:', status, 'filled', filled, 'remaining', remaining,
+                  'lastFillPrice', lastFillPrice)
+            self._tws_orders[int(orderId)]['fill_price'] = lastFillPrice
+            if self.app is not None:
+                symbol = self._tws_orders[int(orderId)]['symbol']
+                side = self._tws_orders[int(orderId)]['side']
+                self.app._on_tws_order_filled(orderId, permId, symbol, side, lastFillPrice, filled)
 
-        c = Contract()
-        c.symbol = symbol
-        c.secType = self._sec_type[contract]
-        c.exchange = exchange
-        c.currency = "USD"
-
-        _timeframe = timeframe[:-1] + ' ' + _tf[timeframe[-1]] + ('s' if timeframe[:-1] != '1' else '')
-
-        _period = ' '.join([i.upper() for i in period])
-        self.reqHistoricalData(9, c, '', _period, _timeframe, 'MIDPOINT', 0, 2, False, [])
-        time.sleep(options.get('sleep') or 4)
-        df = pd.DataFrame(self._candle_data)
-        # print(df)
-        df.index = [datetime.fromtimestamp(int(x), tz=pytz.timezone(self.TIMEZONE)) for x in df.datetime]
-        self._candle_data = []
-        return df[['open', 'high', 'low', 'close', 'volume']]
-
-    def place_order(
-            self,
-            contract: str,
-            symbol: str,
-            side: str,
-            quantity: int,
-            order_type: str = "MARKET",
-            price: float = ...,
-            exchange: str = ...,
-            **options,
-    ) -> int:
-        """
-        Places order to account\n
-        Params:
-            symbol		:	str		=	Ticker symbol
-            side		:	str		=	Side to execute. ie. BUY or SELL
-            quantity	:	int 	=	No of quantity to trade
-            order_type	:	str		=	Entry order type. ie. MARKET or LIMIT or STOP
-            price		:	float	= 	Entry limit price if LIMIT order is to be set or STOP price if stop order is to be set
-
-        Returns:
-            Permenent order ids of order
-        """
-        _order_type = {
-            "MARKET": "MKT",
-            "LIMIT": "LMT",
-            "STOP": "STP"
-        }
-
-        self._raw_vs_perm_order_id = {}
-
+    def get_contract_with_symbol(self, symbol):
         # Creating contract
         c = Contract()
         c.symbol = symbol
-
-        c.secType = self._sec_type[contract]
-        c.exchange = exchange
+        c.secType = "STK"
+        c.exchange = "SMART"
         c.currency = "USD"
+        return c
 
-        # Creating single order
-        order_id = self._get_next_order_id()
-        order = Order()
-        order.orderId = order_id
-        order.action = side.upper()
-        order.orderType = _order_type[order_type]
-        order.totalQuantity = quantity
-        order.transmit = True
-        order.eTradeOnly = False
-        order.firmQuoteOnly = False
+    def place_bracket_order(self, symbol: str, side: str, quantity: Decimal, take_profit_limit_price: float,
+                            stop_loss_price: float):
 
-        if order_type == 'LIMIT':
-            order.lmtPrice = price
-            order.tif = self._default_time_in_force
+        parent_order_id = self._get_next_order_id()
+        c = self.get_contract_with_symbol(symbol)
 
-        if order_type == 'STOP':
-            order.auxPrice = price
-            order.tif = self._default_time_in_force
+        self.reqContractDetails(parent_order_id, c)
 
-        self.placeOrder(order_id, c, order)
+        parent = Order()
+        parent.orderId = parent_order_id
+        parent.action = side.upper()
+        parent.orderType = "MKT"
+        parent.totalQuantity = quantity
+        parent.transmit = False
+        parent.eTradeOnly = False
+        parent.firmQuoteOnly = False
 
-        time.sleep(options.get('sleep', 5))
-        resp = self._tws_orders[order_id]
-        resp.update({'temp_id': int(order_id), 'quantity': quantity})
-        return resp
+        take_profit = Order()
+        take_profit.orderId = parent.orderId + 1
+        take_profit.action = "SELL" if side == "BUY" else "BUY"
+        take_profit.orderType = "LMT"
+        take_profit.totalQuantity = quantity
+        take_profit.lmtPrice = take_profit_limit_price
+        take_profit.parentId = parent_order_id
+        take_profit.transmit = False
+        take_profit.eTradeOnly = False
+        take_profit.firmQuoteOnly = False
 
-    def place_order(self):
-        # Create order object
-        order = Order()
-        order.action = 'BUY'
-        order.totalQuantity = 100000
-        order.orderType = 'LMT'
-        order.lmtPrice = '1.10'
-        order.transmit = False
+        stop_loss = Order()
+        stop_loss.orderId = parent.orderId + 2
+        stop_loss.action = "SELL" if side == "BUY" else "BUY"
+        stop_loss.orderType = "STP"
+        stop_loss.auxPrice = stop_loss_price
+        stop_loss.totalQuantity = quantity
+        stop_loss.parentId = parent_order_id
+        stop_loss.transmit = True
+        stop_loss.eTradeOnly = False
+        stop_loss.firmQuoteOnly = False
 
-        # Create stop loss order object
-        stop_order = Order()
-        stop_order.action = 'SELL'
-        stop_order.totalQuantity = 100000
-        stop_order.orderType = 'STP'
-        stop_order.auxPrice = '1.09'
-        order.transmit = True
+        try:
+            self.placeOrder(parent_order_id, c, parent)
+            self.placeOrder(take_profit.orderId, c, take_profit)
+            self.placeOrder(stop_loss.orderId, c, stop_loss)
+        except Exception as e:
+            print(e)
+
+        return parent_order_id
+
+    def update_order_stop_loss(self, symbol, side, quantity, parent_order_id, stop_loss_price_updated,
+                               trail_percentage):
+
+        c = self.get_contract_with_symbol(symbol)
+
+        self.reqContractDetails(parent_order_id, c)
+
+        stop_loss = Order()
+        stop_loss.orderId = parent_order_id + 3
+        stop_loss.action = "SELL" if side == "BUY" else "BUY"
+        stop_loss.orderType = "STP"
+        stop_loss.auxPrice = stop_loss_price_updated
+        stop_loss.totalQuantity = quantity
+        stop_loss.parentId = parent_order_id
+        stop_loss.transmit = False
+        stop_loss.eTradeOnly = False
+        stop_loss.firmQuoteOnly = False
+
+        trailing_stop_loss = Order()
+        trailing_stop_loss.orderId = stop_loss.orderId + 1
+        trailing_stop_loss.action = stop_loss.action
+        trailing_stop_loss.orderType = "TRAIL"
+        trailing_stop_loss.totalQuantity = quantity
+        trailing_stop_loss.parentId = parent_order_id
+        trailing_stop_loss.trailingPercent = trail_percentage
+        trailing_stop_loss.adjustedStopPrice = stop_loss_price_updated
+        trailing_stop_loss.adjustedStopLimitPrice = stop_loss_price_updated
+        trailing_stop_loss.transmit = True
+        trailing_stop_loss.eTradeOnly = False
+        trailing_stop_loss.firmQuoteOnly = False
+
+        try:
+            self.placeOrder(parent_order_id + 3, c, stop_loss)
+            self.placeOrder(trailing_stop_loss.orderId, c, trailing_stop_loss)
+        except Exception as e:
+            print(e)
+
+    def cancel_order(self, order_id: int) -> None:
+        """
+        Cancel open order\n
+        """
+        self.cancelOrder(orderId=order_id)
 
 
 if __name__ == "__main__":
@@ -241,24 +210,16 @@ if __name__ == "__main__":
         "account": "IB",
         "host": "127.0.0.1",
         "port": 7497,
-        "client_id": 1
+        "client_id": 0
     }
-
+    #
     api = InteractiveBrokerAPI(credentials=creds)
     api.connect()
 
-    # NOTE Get candle data
-    # contract = "stock"
-    # symbol = "AAPL"
-    # timeframe = "5m"
-    # period = "1d"
-    # exchange = "SMART"
-    # df = api.get_candle_data(contract=contract, symbol=symbol, timeframe=timeframe, period=period, exchange=exchange)
-    # print(df)
+    id = api.place_bracket_order("AAPL", "BUY", 1, 148.2, 148.05)
+    api.update_order_stop_loss(symbol="AAPL", side="BUY", quantity=1, parent_order_id=id,
+                               stop_loss_price_updated=148.2,
+                               trail_percentage=0.9)
 
-    contract = "stock"
-    symbol = "AAPL"
-    timeframe = "5m"
-    period = "1d"
-    exchange = "SMART"
-    api.place_order(contract=contract, symbol=symbol, side='BUY', quantity=1, order_type="MARKET")
+    # print("SIII")
+    # api.cancel_order(7)

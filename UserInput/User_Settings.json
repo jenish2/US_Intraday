@@ -11,6 +11,7 @@
   "Order_Type": "MKT",
   "Time_Frame_In_Minutes": "5m",
   "Delta_Range_%": 10,
+  "Target_Profit_%": 50,
   "IS_TD_AMERITRADE_BROKER": false,
   "TD_AMERITRADE_CREDENTIALS": {
     "api_key": "Q9SPHIMLEOIIGGTE4QISQAG7OFMXMJZY",
