@@ -1,17 +1,24 @@
 {
+  "TimeZone_Pytz": "America/New_York",
   "Stock_Name": [
     "AMZN",
-    "AAPL"
+    "MSFT",
+    "CAT",
+    "DIS",
+    "BA",
+    "AAPL",
+    "GS",
+    "HD"
   ],
   "Y_Min_Value_For_CCI": 150,
   "Quantity": 1,
   "Init_PO_Stop_Limit_%": 1,
   "Price_Up_%": 1,
-  "Trailing_Stop_%": 1,
+  "Trailing_Stop_%": 0.9,
   "Order_Type": "MKT",
-  "Time_Frame_In_Minutes": "5m",
+  "Time_Frame_In_Minutes": "1m",
   "Delta_Range_%": 10,
-  "Target_Profit_%": 50,
+  "Target_Profit_%": 5,
   "IS_TD_AMERITRADE_BROKER": false,
   "TD_AMERITRADE_CREDENTIALS": {
     "api_key": "Q9SPHIMLEOIIGGTE4QISQAG7OFMXMJZY",
@@ -23,7 +30,7 @@
     "account": "IB",
     "host": "127.0.0.1",
     "port": 7497,
-    "client_id": 1
+    "client_id": 0
   },
   "User_Name": "",
   "Password": ""

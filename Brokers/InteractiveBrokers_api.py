@@ -59,7 +59,7 @@ class InteractiveBrokerAPI(EWrapper, EClient):
         it by one.
         """
         # reqIds can be used to update the order_id, if tracking is lost.
-        # self.reqIds(-1)
+        # self.order_id = self.reqIds(-1)
         current_order_id = self.order_id
         self.order_id += 1
         return current_order_id
@@ -112,12 +112,10 @@ class InteractiveBrokerAPI(EWrapper, EClient):
         c.currency = "USD"
         return c
 
-    def place_bracket_order(self, symbol: str, side: str, quantity: Decimal, take_profit_limit_price: float,
-                            stop_loss_price: float):
-
+    def place_bracket_order(self, symbol, side, quantity, take_profit_limit_price,
+                            stop_loss_price):
         parent_order_id = self._get_next_order_id()
         c = self.get_contract_with_symbol(symbol)
-
         self.reqContractDetails(parent_order_id, c)
 
         parent = Order()
@@ -202,22 +200,22 @@ class InteractiveBrokerAPI(EWrapper, EClient):
         self.cancelPositions()
 
 
-if __name__ == "__main__":
-    creds = {
-        "account": "IB",
-        "host": "127.0.0.1",
-        "port": 7497,
-        "client_id": 0
-    }
-    #
-    api = InteractiveBrokerAPI(credentials=creds)
-    api.connect()
+# if __name__ == "__main__":
+#     creds = {
+#         "account": "IB",
+#         "host": "127.0.0.1",
+#         "port": 7497,
+#         "client_id": 0
+#     }
+#     #
+#     api = InteractiveBrokerAPI(credentials=creds)
+#     api.connect()
+#
+#     id = api.place_bracket_order("AAPL", "BUY", 1, 148.2, 148.05)
+#     api.update_order_stop_loss(symbol="AAPL", side="BUY", quantity=1, parent_order_id=id,
+#                                stop_loss_price_updated=148.2,
+#                                trail_percentage=0.9)
 
-    id = api.place_bracket_order("AAPL", "BUY", 1, 148.2, 148.05)
-    api.update_order_stop_loss(symbol="AAPL", side="BUY", quantity=1, parent_order_id=id,
-                               stop_loss_price_updated=148.2,
-                               trail_percentage=0.9)
-
-    api.cancel_all_position()
+    # api.cancel_all_position()
     # print("SIII")
     # api.cancel_order(7)
